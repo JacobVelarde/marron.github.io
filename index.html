@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>RA de Galleta con M</title>
+    <title>RA V3</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.min.js"></script>
@@ -16,7 +16,7 @@
         position="0 0 0" 
         look-controls="enabled: false"></a-camera>
 
-      <a-entity id="target" mindar-image-target="targetIndex: 0">
+      <a-entity id="target" mindar-image-target="targetIndex: 0" marker-handler>
         <a-gltf-model 
           id="monk"
           src="./src/monk_character.glb" 
@@ -27,19 +27,18 @@
       </a-entity>
     </a-scene>
     <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        const target = document.querySelector('#target');
-        const monkModel = document.querySelector('#monk');
+      AFRAME.registerComponent('marker-handler', {
+        init: function() {
+          const monkModel = document.querySelector('#monk');
 
-        // evento para cuando se detecta el marcador
-        target.addEventListener('targetfound', () => {
-          monkModel.setAttribute('animation-mixer', 'clip: *');
-        });
+          this.el.addEventListener('targetfound', () => {
+            monkModel.setAttribute('animation-mixer', 'clip: *');
+          });
 
-        // evento para cuando se pierde el marcador
-        target.addEventListener('targetlost', () => {
-          monkModel.removeAttribute('animation-mixer');
-        });
+          this.el.addEventListener('targetlost', () => {
+            monkModel.removeAttribute('animation-mixer');
+          });
+        }
       });
     </script>
   </body>
