@@ -1,78 +1,132 @@
 <!DOCTYPE html>
 <html lang="es">
   <head>
-    <meta charset="UTF-8">
-    <title>RA V6</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
+    <meta charset="UTF-8" />
+    <title>RA V7</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+
+    <!-- Librerías -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.min.js"></script>
 
     <style>
-      #log {
+      html, body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+        width: 100%;
+        height: 100%;
+      }
+      #rotate-alert {
         position: fixed;
-        bottom: 0;
+        top: 0;
         left: 0;
-        right: 0;
-        background: rgba(0,0,0,0.6);
-        color: #00ff88;
-        font-family: monospace;
-        font-size: 14px;
-        padding: 8px;
-        max-height: 120px;
-        overflow-y: auto;
-        z-index: 9999;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #000;
+        color: #fff;
+        font-size: 1.5em;
+        text-align: center;
+        z-index: 10;
+      }
+      #scene-container {
+        display: none;
+        width: 100%;
+        height: 100%;
       }
     </style>
-
-    <script>
-      // Sistema de logs visibles
-      function logMessage(msg) {
-        const log = document.getElementById("log");
-        const line = document.createElement("div");
-        line.textContent = `> ${msg}`;
-        log.appendChild(line);
-        log.scrollTop = log.scrollHeight;
-      }
-
-      AFRAME.registerComponent('marker-handler', {
-        init: function() {
-          const model = document.querySelector('#monk');
-          
-          this.el.addEventListener('targetFound', () => {
-            logMessage("🎯 Marcador detectado");
-            model.setAttribute('animation-mixer', '');
-          });
-
-          this.el.addEventListener('targetLost', () => {
-            logMessage("❌ Marcador perdido");
-            model.removeAttribute('animation-mixer');
-          });
-        }
-      });
-    </script>
   </head>
 
-  <body style="margin: 0; overflow: hidden;">
-    <a-scene
-      mindar-image="imageTargetSrc: ./src/targets.mind; maxTrack: 1;"
-      vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: false"
-      embedded
-      renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;"
-    >
-      <a-camera position="0 0 0"></a-camera>
+  <body>
+    <div id="rotate-alert">
+      🔄 Gira tu dispositivo a modo horizontal (landscape)
+    </div>
 
-      <a-entity mindar-image-target="targetIndex: 0" marker-handler>
-        <a-gltf-model 
-          id="monk"
-          src="./src/monk_character.glb"
-          scale="0.1 0.1 0.1"
-          position="0 0 0">
-        </a-gltf-model>
-      </a-entity>
-    </a-scene>
+    <div id="scene-container">
+      <a-scene 
+        mindar-image="imageTargetSrc: ./src/targets.mind; maxTrack: 1; uiScanning: yes; filterMinCF:0.1; filterBeta: 10;"
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false"
+        embedded
+        id="mindar-scene">
+        
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <div id="log">📱 Log de eventos RA</div>
+        <a-entity id="target" mindar-image-target="targetIndex: 0">
+          <a-gltf-model 
+            id="monk"
+            src="./src/monk_character.glb" 
+            scale="0.1 0.1 0.1" 
+            position="0 0 0" 
+            rotation="0 0 0">
+          </a-gltf-model>
+        </a-entity>
+      </a-scene>
+    </div>
+
+    <script>
+      let mindarComponent = null;
+
+      async function lockToLandscape() {
+        try {
+          if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock("landscape");
+            console.log("🔒 Orientación bloqueada en landscape");
+          }
+        } catch (e) {
+          console.warn("No se pudo bloquear la orientación:", e);
+        }
+      }
+
+      function checkOrientation() {
+        const alertBox = document.getElementById('rotate-alert');
+        const sceneContainer = document.getElementById('scene-container');
+
+        const isLandscape = window.innerWidth > window.innerHeight;
+
+        if (isLandscape) {
+          alertBox.style.display = 'none';
+          sceneContainer.style.display = 'block';
+          resumeCamera();
+        } else {
+          alertBox.style.display = 'flex';
+          sceneContainer.style.display = 'none';
+          pauseCamera();
+        }
+      }
+
+      function pauseCamera() {
+        const scene = document.querySelector('#mindar-scene');
+        if (scene && scene.components && scene.components['mindar-image']) {
+          console.log("⏸️ Pausando cámara...");
+          scene.components['mindar-image'].stop();
+        }
+      }
+
+      function resumeCamera() {
+        const scene = document.querySelector('#mindar-scene');
+        if (scene && scene.components && scene.components['mindar-image']) {
+          console.log("▶️ Reanudando cámara...");
+          scene.components['mindar-image'].start();
+        }
+      }
+
+      window.addEventListener('resize', checkOrientation);
+      window.addEventListener('orientationchange', checkOrientation);
+
+      window.addEventListener('load', async () => {
+        await lockToLandscape();
+
+        const scene = document.querySelector('#mindar-scene');
+        scene.addEventListener('loaded', () => {
+          mindarComponent = scene.components['mindar-image'];
+        });
+
+        checkOrientation();
+      });
+    </script>
   </body>
 </html>
