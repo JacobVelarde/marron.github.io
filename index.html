@@ -1,10 +1,25 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>RA V3</title>
+    <title>RA V4</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.min.js"></script>
+    <script>
+      AFRAME.registerComponent('marker-handler', {
+        init: function() {
+          const monkModel = document.querySelector('#monk');
+
+          this.el.addEventListener('targetfound', () => {
+            monkModel.setAttribute('animation-mixer', 'clip: *');
+          });
+
+          this.el.addEventListener('targetlost', () => {
+            monkModel.removeAttribute('animation-mixer');
+          });
+        }
+      });
+    </script>
   </head>
   <body style="margin: 0; overflow: hidden;">
     <a-scene 
@@ -26,20 +41,5 @@
         </a-gltf-model>
       </a-entity>
     </a-scene>
-    <script>
-      AFRAME.registerComponent('marker-handler', {
-        init: function() {
-          const monkModel = document.querySelector('#monk');
-
-          this.el.addEventListener('targetfound', () => {
-            monkModel.setAttribute('animation-mixer', 'clip: *');
-          });
-
-          this.el.addEventListener('targetlost', () => {
-            monkModel.removeAttribute('animation-mixer');
-          });
-        }
-      });
-    </script>
   </body>
 </html>
