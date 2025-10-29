@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8">
-    <title>RA V8</title>
+    <title>RA V9</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -76,6 +76,7 @@
       }
 
       async function lockToLandscape() {
+        logMessage("Validando orientacion")
         try {
           if (screen.orientation && screen.orientation.lock) {
             await screen.orientation.lock("landscape");
@@ -120,6 +121,7 @@
       }
 
       async function checkCameraPermission() {
+        logMessage("Validando permisos de camera")
         const permissionAlert = document.getElementById('permission-alert');
         const loading = document.getElementById('loading');
 
@@ -143,6 +145,7 @@
       window.addEventListener('orientationchange', checkOrientation);
 
       window.addEventListener('load', async () => {
+        logMessage("LOAD")
         await lockToLandscape();
         await checkCameraPermission();
 
