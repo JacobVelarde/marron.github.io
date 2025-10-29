@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8">
-    <title>RA V9</title>
+    <title>RA V10</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -80,10 +80,10 @@
         try {
           if (screen.orientation && screen.orientation.lock) {
             await screen.orientation.lock("landscape");
-            console.log("🔒 Orientación bloqueada en landscape");
+            logMessage("🔒 Orientación bloqueada en landscape");
           }
         } catch (e) {
-          console.warn("No se pudo bloquear la orientación:", e);
+          logMessage("No se pudo bloquear la orientación:", e);
         }
       }
 
@@ -107,7 +107,7 @@
       function pauseCamera() {
         const scene = document.querySelector('#mindar-scene');
         if (scene && scene.components && scene.components['mindar-image']) {
-          console.log("⏸️ Pausando cámara...");
+          logMessage("⏸️ Pausando cámara...");
           scene.components['mindar-image'].stop();
         }
       }
@@ -115,7 +115,7 @@
       function resumeCamera() {
         const scene = document.querySelector('#mindar-scene');
         if (scene && scene.components && scene.components['mindar-image']) {
-          console.log("▶️ Reanudando cámara...");
+          logMessage("▶️ Reanudando cámara...");
           scene.components['mindar-image'].start();
         }
       }
@@ -129,13 +129,13 @@
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           stream.getTracks().forEach(track => track.stop()); // liberar cámara
-          console.log("✅ Permiso de cámara concedido");
+          logMessage("✅ Permiso de cámara concedido");
           permissionAlert.style.display = 'none';
           loading.style.display = 'none';
           document.getElementById('scene-container').style.display = 'block';
           checkOrientation();
         } catch (err) {
-          console.warn("❌ Permiso de cámara denegado:", err);
+          logMessage("❌ Permiso de cámara denegado:", err);
           loading.style.display = 'none';
           permissionAlert.style.display = 'flex';
         }
