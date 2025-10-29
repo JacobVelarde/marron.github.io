@@ -94,13 +94,15 @@
         const isLandscape = window.innerWidth > window.innerHeight;
 
         if (isLandscape) {
-          alertBox.style.display = 'none';
-          sceneContainer.style.display = 'block';
-          resumeCamera();
+            logMessage("is landscaoe")
+            alertBox.style.display = 'none';
+            sceneContainer.style.display = 'block';
+            resumeCamera();
         } else {
-          alertBox.style.display = 'flex';
-          sceneContainer.style.display = 'none';
-          pauseCamera();
+            logMessage("ir portraite")
+            alertBox.style.display = 'flex';
+            sceneContainer.style.display = 'none';
+            pauseCamera();
         }
       }
 
@@ -190,9 +192,9 @@
       Ve a los ajustes del navegador y actívalo para continuar.
     </div>
 
-    <div id="loading" class="overlay">
+    <!--<div id="loading" class="overlay">
       📷 Activando cámara... espera un momento
-    </div>
+    </div>-->
 
     <div id="scene-container">
         <a-scene
