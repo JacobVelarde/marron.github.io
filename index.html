@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8">
-    <title>RA V11</title>
+    <title>RA V13</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -109,17 +109,19 @@
       function pauseCamera() {
         const scene = document.querySelector('#mindar-scene');
         if (scene && scene.components && scene.components['mindar-image']) {
-          logMessage("⏸️ Pausando cámara...");
-          scene.components['mindar-image'].stop();
+          const mindar = scene.components['mindar-image'];
+          if (mindar && mindar.isReady) {
+            logMessage("⏸️ Pausando cámara...");
+            mindar.stop();
+          }
         }
       }
 
       function resumeCamera() {
-        const scene = document.querySelector('#mindar-scene');
-        if (scene && scene.components && scene.components['mindar-image']) {
-          logMessage("▶️ Reanudando cámara...");
-          scene.components['mindar-image'].start();
-        }
+        // La cámara se reanudará automáticamente cuando la escena sea visible
+        // y MindAR detecte que necesita iniciarse.
+        // No es necesario llamar a start() manualmente en este flujo.
+        logMessage("▶️ Reanudando cámara...");
       }
 
       async function checkCameraPermission() {
@@ -128,37 +130,35 @@
         const loading = document.getElementById('loading');
 
         loading.style.display = 'flex';
-        navigator.permissions.query({ name: 'camera' })
-            .then(result => {
-                if (result.state === 'granted') {
-                    logMessage("✅ Permiso de cámara concedid")
-                    stream.getTracks().forEach(track => track.stop()); // liberar cámara
-                    permissionAlert.style.display = 'none';
-                    loading.style.display = 'none';
-                    document.getElementById('scene-container').style.display = 'block';
-                    checkOrientation();
-                }else{
-                    logMessage("❌ Permiso de cámara denegado:", err);
-                    loading.style.display = 'none';
-                    permissionAlert.style.display = 'flex';
-                }
-        }).catch(err => {
-            logMessage("❌ Permiso de cámara denegado:", err);
-        })
-
+        try {
+          // Pedimos acceso a la cámara para verificar el permiso
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          logMessage("✅ Permiso de cámara concedido");
+          // Detenemos el stream inmediatamente, MindAR gestionará el suyo propio
+          stream.getTracks().forEach(track => track.stop());
+          
+          permissionAlert.style.display = 'none';
+          loading.style.display = 'none';
+          checkOrientation();
+        } catch (err) {
+          logMessage("❌ Permiso de cámara denegado: " + err.message);
+          loading.style.display = 'none';
+          permissionAlert.style.display = 'flex';
+        }
       }
 
       window.addEventListener('resize', checkOrientation);
       window.addEventListener('orientationchange', checkOrientation);
 
       window.addEventListener('load', async () => {
-        logMessage("LOAD")
+        logMessage("Página cargada. Iniciando...");
         await lockToLandscape();
         await checkCameraPermission();
 
         const scene = document.querySelector('#mindar-scene');
         scene.addEventListener('loaded', () => {
           mindarComponent = scene.components['mindar-image'];
+          logMessage("Escena de MindAR cargada.");
         });
       });
 
