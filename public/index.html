@@ -2,34 +2,45 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8">
-    <title>RA V13</title>
+    <title>RA V19</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
+
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
     <style>
-      #log {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: rgba(0,0,0,0.6);
-        color: #00ff88;
-        font-family: monospace;
-        font-size: 14px;
-        padding: 8px;
-        max-height: 120px;
-        overflow-y: auto;
-        z-index: 9999;
-      }
       html, body {
         margin: 0;
-        overflow: hidden;
-        background: #000;
+        padding: 0;
         width: 100%;
         height: 100%;
+        overflow: hidden;
+        background: #000;
         font-family: sans-serif;
+      }
+
+      #scene-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: none; /* se activa cuando landscape */
+        overflow: hidden;
+      }
+
+      a-scene {
+        position: absolute !important;
+        top: 0;
+        left: 0;
+        width: 100% !important;
+        height: 100% !important;
+        z-index: 1;
+      }
+
+      .a-canvas {
+        width: 100% !important;
+        height: 100% !important;
       }
 
       .overlay {
@@ -38,35 +49,36 @@
         left: 0;
         width: 100%;
         height: 100%;
-        display: flex;
+        display: none;
         justify-content: center;
         align-items: center;
-        background: #000;
+        background: rgba(0, 0, 0, 0.9);
         color: #fff;
         font-size: 1.5em;
         text-align: center;
         padding: 20px;
-        z-index: 20;
+        z-index: 5; /* menor que la escena */
       }
 
-      #scene-container {
-        display: none;
-        width: 100%;
-        height: 100%;
-      }
-
-      #loading {
-        display: none;
-        background: rgba(0,0,0,0.7);
-        font-size: 1em;
-        color: #fff;
+      #log {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.6);
+        color: #00ff88;
+        font-family: monospace;
+        font-size: 14px;
+        padding: 8px;
+        max-height: 120px;
+        overflow-y: auto;
+        z-index: 10;
       }
     </style>
 
     <script>
       let mindarComponent = null;
 
-      // Sistema de logs visibles
       function logMessage(msg) {
         const log = document.getElementById("log");
         const line = document.createElement("div");
@@ -76,14 +88,14 @@
       }
 
       async function lockToLandscape() {
-        logMessage("Validando orientacion")
+        logMessage("Validando orientación");
         try {
           if (screen.orientation && screen.orientation.lock) {
             await screen.orientation.lock("landscape");
             logMessage("🔒 Orientación bloqueada en landscape");
           }
         } catch (e) {
-          logMessage("No se pudo bloquear la orientación:", e);
+          logMessage("No se pudo bloquear la orientación: " + e.message);
         }
       }
 
@@ -94,15 +106,16 @@
         const isLandscape = window.innerWidth > window.innerHeight;
 
         if (isLandscape) {
-            logMessage("is landscaoe")
-            alertBox.style.display = 'none';
-            sceneContainer.style.display = 'block';
-            resumeCamera();
+          logMessage("📱 Modo landscape detectado");
+          alertBox.style.display = 'none';
+          sceneContainer.style.display = 'block';
+          setTimeout(() => startMindAR(), 1000);
+
         } else {
-            logMessage("ir portraite")
-            alertBox.style.display = 'flex';
-            sceneContainer.style.display = 'none';
-            pauseCamera();
+          logMessage("📱 Modo portrait detectado");
+          alertBox.style.display = 'flex';
+          sceneContainer.style.display = 'none';
+          pauseCamera();
         }
       }
 
@@ -117,104 +130,94 @@
         }
       }
 
-      function resumeCamera() {
-        // La cámara se reanudará automáticamente cuando la escena sea visible
-        // y MindAR detecte que necesita iniciarse.
-        // No es necesario llamar a start() manualmente en este flujo.
-        logMessage("▶️ Reanudando cámara...");
+      function startMindAR() {
+        const scene = document.querySelector('a-scene');
+        scene.style.display = 'block';
+        scene.emit('start'); // o simplemente deja que se inicialice
+        logMessage("🚀 MindAR inicializado");
       }
 
       async function checkCameraPermission() {
-        logMessage("Validando permisos de camera")
+        logMessage("Validando permisos de cámara");
         const permissionAlert = document.getElementById('permission-alert');
         const loading = document.getElementById('loading');
 
-        loading.style.display = 'flex';
         try {
-          // Pedimos acceso a la cámara para verificar el permiso
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           logMessage("✅ Permiso de cámara concedido");
-          // Detenemos el stream inmediatamente, MindAR gestionará el suyo propio
-          stream.getTracks().forEach(track => track.stop());
-          
+          //stream.getTracks().forEach(track => track.stop());
           permissionAlert.style.display = 'none';
-          loading.style.display = 'none';
           checkOrientation();
         } catch (err) {
           logMessage("❌ Permiso de cámara denegado: " + err.message);
-          loading.style.display = 'none';
           permissionAlert.style.display = 'flex';
         }
       }
 
-      window.addEventListener('resize', checkOrientation);
-      window.addEventListener('orientationchange', checkOrientation);
+      //window.addEventListener('resize', checkOrientation);
+      //window.addEventListener('orientationchange', checkOrientation);
 
       window.addEventListener('load', async () => {
         logMessage("Página cargada. Iniciando...");
-        await lockToLandscape();
-        await checkCameraPermission();
+        const sceneContainer = document.getElementById('scene-container');
+        sceneContainer.style.display = 'block'; // mostrar antes de inicializar
+        //await lockToLandscape();
+        //await checkCameraPermission();
 
         const scene = document.querySelector('#mindar-scene');
         scene.addEventListener('loaded', () => {
           mindarComponent = scene.components['mindar-image'];
-          logMessage("Escena de MindAR cargada.");
+          logMessage("✅ Escena MindAR cargada");
         });
       });
 
       AFRAME.registerComponent('marker-handler', {
         init: function() {
           const model = document.querySelector('#monk');
-          
           this.el.addEventListener('targetFound', () => {
             logMessage("🎯 Marcador detectado");
             model.setAttribute('animation-mixer', '');
           });
-
           this.el.addEventListener('targetLost', () => {
             logMessage("❌ Marcador perdido");
             model.removeAttribute('animation-mixer');
           });
         }
       });
-
     </script>
   </head>
 
-  <body style="margin: 0; overflow: hidden;">
-
+  <body>
     <div id="rotate-alert" class="overlay">
       🔄 Gira tu dispositivo a modo horizontal (landscape)
     </div>
 
-    <div id="permission-alert" class="overlay" style="display:none;">
+    <div id="permission-alert" class="overlay">
       ⚠️ Necesitamos permiso para usar tu cámara<br><br>
-      Ve a los ajustes del navegador y actívalo para continuar.
+      Actívalo desde los ajustes del navegador.
     </div>
 
-    <!--<div id="loading" class="overlay">
-      📷 Activando cámara... espera un momento
-    </div>-->
-
     <div id="scene-container">
-        <a-scene
+      <a-scene
         id="mindar-scene"
         mindar-image="imageTargetSrc: ./src/targets.mind; maxTrack: 1;"
-        vr-mode-ui="enabled: false"
-        device-orientation-permission-ui="enabled: false"
         embedded
-        renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;">
-            <a-camera position="0 0 0"></a-camera>
+        color-space="sRGB"
+        renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true;"
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false">
 
-            <a-entity mindar-image-target="targetIndex: 0" marker-handler>
-                    <a-gltf-model 
-                    id="monk"
-                    src="./src/monk_character.glb"
-                    scale="0.1 0.1 0.1"
-                    position="0 0 0">
-                    </a-gltf-model>
-            </a-entity>
-        </a-scene>
+        <a-camera position="0 0 0"></a-camera>
+
+        <a-entity mindar-image-target="targetIndex: 0" marker-handler>
+          <a-gltf-model
+            id="monk"
+            src="./src/monk_character.glb"
+            scale="0.1 0.1 0.1"
+            position="0 0 0">
+          </a-gltf-model>
+        </a-entity>
+      </a-scene>
     </div>
 
     <div id="log">📱 Log de eventos RA</div>
