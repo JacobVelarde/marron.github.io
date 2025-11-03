@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8">
-    <title>RA V19</title>
+    <title>RA V20</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -158,7 +158,10 @@
       //window.addEventListener('orientationchange', checkOrientation);
 
       window.addEventListener('load', async () => {
-        logMessage("Página cargada. Iniciando...");
+        //logMessage("Página cargada. Iniciando...");
+        logMessage("📸 Mueve tu cámara hasta que la galleta quede bien enfocada")
+        logMessage("Acércala o aléjala un poco hasta que la galleta cobre vida")
+
         const sceneContainer = document.getElementById('scene-container');
         sceneContainer.style.display = 'block'; // mostrar antes de inicializar
         //await lockToLandscape();
@@ -167,7 +170,7 @@
         const scene = document.querySelector('#mindar-scene');
         scene.addEventListener('loaded', () => {
           mindarComponent = scene.components['mindar-image'];
-          logMessage("✅ Escena MindAR cargada");
+          //logMessage("✅ Escena MindAR cargada");
         });
       });
 
@@ -200,7 +203,7 @@
     <div id="scene-container">
       <a-scene
         id="mindar-scene"
-        mindar-image="imageTargetSrc: ./src/targets.mind; maxTrack: 1;"
+        mindar-image="imageTargetSrc: ./src/targetV2.mind; maxTrack: 1;"
         embedded
         color-space="sRGB"
         renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true;"
@@ -213,13 +216,13 @@
           <a-gltf-model
             id="monk"
             src="./src/monk_character.glb"
-            scale="0.1 0.1 0.1"
-            position="0 0 0">
+            scale="0.2 0.2 0.2"
+            position="0 0.1 0">
           </a-gltf-model>
         </a-entity>
       </a-scene>
     </div>
 
-    <div id="log">📱 Log de eventos RA</div>
+    <div id="log">📱 Marrón</div>
   </body>
 </html>
