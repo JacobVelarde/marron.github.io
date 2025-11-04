@@ -1,228 +1,148 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8">
-    <title>RA V22</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+  <meta charset="UTF-8">
+  <title>RA Silueta de Corazón 🍪 V1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- OpenCV.js -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #000;
+    }
+    video {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      object-fit: cover;
+      display: block;
+      z-index: 0;
+    }
+    #canvasOutput {
+      display: none;
+    }
+    a-scene {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: 1;
+    }
+    #msg {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      text-align: center;
+      font-size: 1.2em;
+      padding: 12px;
+      z-index: 2;
+    }
+  </style>
+</head>
+<body>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvasOutput"></canvas>
 
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: #000;
-        font-family: sans-serif;
+  <a-scene embedded vr-mode-ui="enabled: false">
+    <a-assets>
+      <a-asset-item id="heart3d" src="./src/monk_character.glb"></a-asset-item>
+    </a-assets>
+
+    <a-entity id="heartModel"
+              gltf-model="#heart3d"
+              scale="0 0 0"
+              position="0 0 -3"
+              animation__scale="property: scale; to: 0.3 0.3 0.3; dur: 600; easing: easeOutElastic;">
+    </a-entity>
+
+    <a-camera position="0 0 0"></a-camera>
+  </a-scene>
+
+  <div id="msg">📸 Aleja o acerca la cámara hasta que el corazón se vea completo.</div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvasOutput');
+    const msg = document.getElementById('msg');
+    const heartModel = document.getElementById('heartModel');
+
+    // Iniciar cámara
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(err => {
+        msg.textContent = "⚠️ No se pudo acceder a la cámara: " + err.message;
+      });
+
+    let processing = false;
+
+    // Esperar a que cargue OpenCV
+    window.onload = function() {
+      if (cv.getBuildInformation) {
+        console.log("✅ OpenCV listo");
+        startDetection();
+      } else {
+        cv['onRuntimeInitialized'] = () => {
+          console.log("✅ OpenCV cargado");
+          startDetection();
+        };
       }
+    };
 
-      #scene-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        display: none; /* se activa cuando landscape */
-        overflow: hidden;
-      }
+    function startDetection() {
+      const cap = new cv.VideoCapture(video);
+      const src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+      const gray = new cv.Mat();
+      const edges = new cv.Mat();
+      const contours = new cv.MatVector();
+      const hierarchy = new cv.Mat();
 
-      a-scene {
-        position: absolute !important;
-        top: 0;
-        left: 0;
-        width: 100% !important;
-        height: 100% !important;
-        z-index: 1;
-      }
+      function processVideo() {
+        if (processing) return;
+        processing = true;
 
-      .a-canvas {
-        width: 100% !important;
-        height: 100% !important;
-      }
+        cap.read(src);
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+        cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
+        cv.Canny(gray, edges, 80, 150);
 
-      .overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        display: none;
-        justify-content: center;
-        align-items: center;
-        background: rgba(0, 0, 0, 0.9);
-        color: #fff;
-        font-size: 1.5em;
-        text-align: center;
-        padding: 20px;
-        z-index: 5; /* menor que la escena */
-      }
+        cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-      #log {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: rgba(0, 0, 0, 0.6);
-        color: #00ff88;
-        font-family: monospace;
-        font-size: 14px;
-        padding: 8px;
-        max-height: 120px;
-        overflow-y: auto;
-        z-index: 10;
-      }
-    </style>
+        let detected = false;
 
-    <script>
-      let mindarComponent = null;
+        for (let i = 0; i < contours.size(); i++) {
+          const cnt = contours.get(i);
+          const area = cv.contourArea(cnt);
+          if (area < 5000 || area > 50000) continue; // rango de tamaño
 
-      function logMessage(msg) {
-        const log = document.getElementById("log");
-        const line = document.createElement("div");
-        line.textContent = `> ${msg}`;
-        log.appendChild(line);
-        log.scrollTop = log.scrollHeight;
-      }
-
-      async function lockToLandscape() {
-        logMessage("Validando orientación");
-        try {
-          if (screen.orientation && screen.orientation.lock) {
-            await screen.orientation.lock("landscape");
-            logMessage("🔒 Orientación bloqueada en landscape");
+          const rect = cv.boundingRect(cnt);
+          const ratio = rect.width / rect.height;
+          if (ratio > 0.8 && ratio < 1.2) {
+            detected = true;
+            break;
           }
-        } catch (e) {
-          logMessage("No se pudo bloquear la orientación: " + e.message);
         }
-      }
 
-      function checkOrientation() {
-        const alertBox = document.getElementById('rotate-alert');
-        const sceneContainer = document.getElementById('scene-container');
-
-        const isLandscape = window.innerWidth > window.innerHeight;
-
-        if (isLandscape) {
-          logMessage("📱 Modo landscape detectado");
-          alertBox.style.display = 'none';
-          sceneContainer.style.display = 'block';
-          setTimeout(() => startMindAR(), 1000);
-
+        if (detected) {
+          msg.textContent = "💖 ¡Corazón detectado!";
+          heartModel.setAttribute('scale', '0.3 0.3 0.3');
         } else {
-          logMessage("📱 Modo portrait detectado");
-          alertBox.style.display = 'flex';
-          sceneContainer.style.display = 'none';
-          pauseCamera();
+          msg.textContent = "📸 Aleja o acerca la cámara hasta que el corazón se vea completo.";
+          heartModel.setAttribute('scale', '0 0 0');
         }
+
+        processing = false;
+        requestAnimationFrame(processVideo);
       }
 
-      function pauseCamera() {
-        const scene = document.querySelector('#mindar-scene');
-        if (scene && scene.components && scene.components['mindar-image']) {
-          const mindar = scene.components['mindar-image'];
-          if (mindar && mindar.isReady) {
-            logMessage("⏸️ Pausando cámara...");
-            mindar.stop();
-          }
-        }
-      }
-
-      function startMindAR() {
-        const scene = document.querySelector('a-scene');
-        scene.style.display = 'block';
-        scene.emit('start'); // o simplemente deja que se inicialice
-        logMessage("🚀 MindAR inicializado");
-      }
-
-      async function checkCameraPermission() {
-        logMessage("Validando permisos de cámara");
-        const permissionAlert = document.getElementById('permission-alert');
-        const loading = document.getElementById('loading');
-
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          logMessage("✅ Permiso de cámara concedido");
-          //stream.getTracks().forEach(track => track.stop());
-          permissionAlert.style.display = 'none';
-          checkOrientation();
-        } catch (err) {
-          logMessage("❌ Permiso de cámara denegado: " + err.message);
-          permissionAlert.style.display = 'flex';
-        }
-      }
-
-      //window.addEventListener('resize', checkOrientation);
-      //window.addEventListener('orientationchange', checkOrientation);
-
-      window.addEventListener('load', async () => {
-        //logMessage("Página cargada. Iniciando...");
-        logMessage("📸 Mueve tu cámara hasta que la galleta quede bien enfocada")
-        logMessage("Acércala o aléjala un poco hasta que la galleta cobre vida")
-
-        const sceneContainer = document.getElementById('scene-container');
-        sceneContainer.style.display = 'block'; // mostrar antes de inicializar
-        //await lockToLandscape();
-        //await checkCameraPermission();
-
-        const scene = document.querySelector('#mindar-scene');
-        scene.addEventListener('loaded', () => {
-          mindarComponent = scene.components['mindar-image'];
-          //logMessage("✅ Escena MindAR cargada");
-        });
-      });
-
-      AFRAME.registerComponent('marker-handler', {
-        init: function() {
-          const model = document.querySelector('#monk');
-          this.el.addEventListener('targetFound', () => {
-            logMessage("🎯 Marcador detectado");
-            model.setAttribute('animation-mixer', '');
-          });
-          this.el.addEventListener('targetLost', () => {
-            logMessage("❌ Marcador perdido");
-            model.removeAttribute('animation-mixer');
-          });
-        }
-      });
-    </script>
-  </head>
-
-  <body>
-    <div id="rotate-alert" class="overlay">
-      🔄 Gira tu dispositivo a modo horizontal (landscape)
-    </div>
-
-    <div id="permission-alert" class="overlay">
-      ⚠️ Necesitamos permiso para usar tu cámara<br><br>
-      Actívalo desde los ajustes del navegador.
-    </div>
-
-    <div id="scene-container">
-      <a-scene
-        id="mindar-scene"
-        mindar-image="imageTargetSrc: ./src/targetV3.mind; maxTrack: 1;"
-        embedded
-        color-space="sRGB"
-        renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true;"
-        vr-mode-ui="enabled: false"
-        device-orientation-permission-ui="enabled: false">
-
-        <a-camera position="0 0 0"></a-camera>
-
-        <a-entity mindar-image-target="targetIndex: 0" marker-handler>
-          <a-gltf-model
-            id="monk"
-            src="./src/monk_character.glb"
-            scale="0.2 0.2 0.2"
-            position="0 0.1 0">
-          </a-gltf-model>
-        </a-entity>
-      </a-scene>
-    </div>
-
-    <div id="log">📱 Marrón</div>
-  </body>
+      requestAnimationFrame(processVideo);
+    }
+  </script>
+</body>
 </html>
