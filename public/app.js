@@ -1,113 +1,163 @@
+// 1. IMPORTAR LAS LIBRERÍAS
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// ¡Importamos ARButton aquí en el JS!
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 // 2. VARIABLES GLOBALES
 let camera, scene, renderer, model;
 let mixer;
 const clock = new THREE.Clock();
-
-// --- NUEVAS VARIABLES GLOBALES ---
-let reticle; // El anillo que muestra dónde está el suelo
-let hitTestSource = null; // La fuente de "rayos" para el Hit Test
+let reticle;
+let hitTestSource = null;
 let hitTestSourceRequested = false;
-// --- FIN DE NUEVAS VARIABLES ---
+let controller;
+
+
+    // --- INICIO: LÓGICA DE DETECCIÓN DE iOS ---
+
+  // Función para detectar si es iOS
+function isIOS() {
+    return [
+      'iPad Simulator', 'iPhone Simulator', 'iPod Simulator', 'iPad', 'iPhone', 'iPod'
+    ].includes(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+}
 
 // 3. INICIAR TODO
 init();
 
-// --- FUNCIONES PRINCIPALES ---
+// --- FUNCIONES ---
 
 function init() {
-  // A. CREAR LA ESCENA
   scene = new THREE.Scene();
-
-  // B. CREAR LA CÁMARA
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-  // C. AÑADIR LUCES
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
   scene.add(ambientLight);
   const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
   directionalLight.position.set(1, 1, 1);
   scene.add(directionalLight);
 
-  // D. CREAR EL RENDERER
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.xr.enabled = true;
-  renderer.xr.addEventListener('sessionstart', () => {
-    const session = renderer.xr.getSession();
-    session.addEventListener('select', onSelect);
-  });
+  renderer.xr.enabled = true; // Habilitamos WebXR (para Android)
+  document.body.appendChild(renderer.domElement);
 
-  // E. AÑADIR EL BOTÓN DE AR
-  // --- MODIFICADO ---
-  // Ahora le pedimos al navegador que active la función 'hit-test'
-  document.body.appendChild(ARButton.createButton(renderer, {
-    requiredFeatures: ['hit-test'] // <-- ¡ESTA LÍNEA ES NUEVA!
-  }));
-  // --- FIN DE MODIFICACIÓN ---
-
-  // F. CARGAR EL MODELO 3D
+  // Obtenemos el parámetro de la URL
   const params = new URLSearchParams(window.location.search);
   const animacion = params.get('anim');
-  let modeloSrc = '';
+
+  // Definimos las rutas de los modelos
+  let modeloGlb = '';
+  let modeloUsdz = ''; // <-- ¡NUEVO! Necesitamos la ruta al .usdz
 
   if (animacion === 'reno') {
-    modeloSrc = './src/monk_character.glb';
+    modeloGlb = './src/monk_character.glb';
+    modeloUsdz = './src/pc.usdz'; // <-- ¡DEBES TENER ESTE ARCHIVO!
   } else if (animacion === 'arbol') {
-    modeloSrc = './modelos/arbol.glb';
-  } else if (animacion === 'gnomo') {
-    modeloSrc = './modelos/gnomo.glb';
-  } else if (animacion === 'estrella') {
-    modeloSrc = './modelos/estrella.glb';
+    // ... define tus otras rutas glb y usdz
   } else {
-    modeloSrc = './modelos/error.glb';
+    // ... modelo de error
   }
 
-  const loader = new GLTFLoader();
-  loader.load(modeloSrc, (gltf) => {
-    model = gltf.scene;
+  if (isIOS()) {
+    // --- LÓGICA DE iOS (AR Quick Look) ---
+    // No necesitamos Three.js para la RA, solo para el visor 2D.
     
+    // Mostramos el modelo en 2D (igual que antes)
+    cargarVisor2DiOS(modeloGlb); 
+    
+    // Obtenemos los elementos HTML de iOS
+    const arLink = document.getElementById('ar-link-ios');
+    const arButton = document.getElementById('ar-button-ios');
+    
+    // Creamos una imagen de póster (miniatura) para Quick Look
+    // (Opcional pero recomendado)
+    // arLink.appendChild(document.createElement('img')); 
+    
+    // Configuramos el enlace invisible
+    arLink.setAttribute('rel', 'ar');
+    arLink.setAttribute('href', modeloUsdz);
+    arLink.style.display = 'block';
+    arButton.style.display = 'block';
+
+  } else {
+    // --- LÓGICA DE ANDROID (CORREGIDA) ---
+    
+    // Mostramos el modelo en 2D
+    cargarVisor2DAndroid(modeloGlb); 
+
+    // Añadimos el botón de WebXR
+    document.body.appendChild(ARButton.createButton(renderer, {
+      requiredFeatures: ['hit-test']
+    }));
+    
+    // --- CORRECCIÓN: FALTABAN ESTOS LISTENERS ---
+    // (Sin esto, la variable 'isDragging' nunca cambiaba)
+    controller = renderer.xr.getController(0);
+    controller.addEventListener('select', onSelect);
+    scene.add(controller);
+    // --- FIN DE CORRECCIÓN ---
+    
+    // Creamos la retícula (anillo)
+    const reticleGeometry = new THREE.RingGeometry(0.05, 0.07, 32).rotateX(-Math.PI / 2);
+    const reticleMaterial = new THREE.MeshBasicMaterial();
+    reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+    reticle.matrixAutoUpdate = false;
+    reticle.visible = false;
+    scene.add(reticle);
+  }
+  
+  // --- FIN: LÓGICA DE DETECCIÓN ---
+
+  renderer.setAnimationLoop(animate);
+  window.addEventListener('resize', onWindowResize);
+}
+
+// --- NUEVA FUNCIÓN: Cargar Visor 2D ---
+// Separamos la lógica de carga para poder reusarla
+function cargarVisor2DiOS(rutaGlb) {
+  const loader = new GLTFLoader();
+  loader.load(rutaGlb, (gltf) => {
+    model = gltf.scene;
     if (gltf.animations && gltf.animations.length) {
       mixer = new THREE.AnimationMixer(model);
       const action = mixer.clipAction(gltf.animations[0]);
       action.play();
     }
-    
-    // --- MODIFICADO ---
-    // El modelo ya no se añade a la escena aquí.
-    // Lo haremos invisible y lo moveremos al centro (0,0,0) para empezar.
-    model.visible = false; // <-- ¡NUEVO!
-    model.scale.set(0.1, 0.1, 0.1);
+    // En el V5, el modelo SÍ es visible al inicio (para el visor 2D)
+    model.visible = true; 
+    model.scale.set(0.3, 0.3, 0.3); // Ajusta la escala para el visor 2D
+    model.position.set(0, 0, -1); // Ponlo frente a la cámara 2D
     scene.add(model);
-    // --- FIN DE MODIFICACIÓN ---
-    
   }, undefined, (error) => {
     console.error('Error al cargar el modelo:', error);
   });
-
-  // G. INICIAR EL BUCLE DE RENDERIZADO
-  renderer.setAnimationLoop(animate);
-  
-  // H. Ajustar la ventana si cambia de tamaño
-  window.addEventListener('resize', onWindowResize);
-
-  // --- I. NUEVO: CREAR LA RETÍCULA (EL ANILLO) ---
-  const reticleGeometry = new THREE.RingGeometry(0.05, 0.07, 32).rotateX(-Math.PI / 2); // Rota para que esté plano en el suelo
-  const reticleMaterial = new THREE.MeshBasicMaterial();
-  reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
-  reticle.matrixAutoUpdate = false; // Nosotros controlaremos su posición
-  reticle.visible = false; // Oculto hasta que encontremos el suelo
-  scene.add(reticle);
-  // --- FIN DE NUEVO ---
-  
-  // --- J. NUEVO: MANEJAR EL "TOQUE" EN PANTALLA ---
-  // renderer.domElement.addEventListener('touchend', onSelect);
-  // --- FIN DE NUEVO ---
 }
+
+function cargarVisor2DAndroid(rutaGlb) {
+  const loader = new GLTFLoader();
+  loader.load(rutaGlb, (gltf) => {
+    model = gltf.scene;
+    if (gltf.animations && gltf.animations.length) {
+      mixer = new THREE.AnimationMixer(model);
+      const action = mixer.clipAction(gltf.animations[0]);
+      action.play();
+    }
+    // En el V5, el modelo SÍ es visible al inicio (para el visor 2D)
+    model.visible = true; 
+    model.scale.set(0.3, 0.3, 0.3); // Ajusta la escala para el visor 2D
+    model.position.set(0, 0, -1); // Ponlo frente a la cámara 2D
+    scene.add(model);
+  }, undefined, (error) => {
+    console.error('Error al cargar el modelo:', error);
+  });
+}
+
+// --- FUNCIONES DE ANDROID / WEBXR ---
+// (Estas son las funciones V4 que ya tenías)
+// (onWindowResize, onSelectStart, onSelectEnd, onSelect, animate)
 
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -115,7 +165,8 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// --- K. MODIFICADO: onSelect (V3) ---
+const ROTATION_SPEED = 3;
+
 function onSelect() {
   // Solo necesitamos verificar si la retícula está visible y si el modelo cargó
   if (reticle.visible && model) { 
@@ -132,24 +183,29 @@ function onSelect() {
     // Dejamos que la retícula siga activa para poder re-colocar.
   }
 }
-// --- FIN DE MODIFICACIÓN ---
 
-// --- L. MODIFICADO: animate (V3) ---
 function animate(timestamp, frame) {
-  // Actualizar la animación
   const delta = clock.getDelta();
-  if (mixer) {
-    mixer.update(delta);
+  if (mixer) mixer.update(delta);
+
+  // Lógica de rotación (solo si estamos en RA en Android)
+  if (renderer.xr.isPresenting && isDragging && model && controller.inputSource && controller.inputSource.gamepad) {
+    const currentDragX = controller.inputSource.gamepad.axes[0]; 
+    const deltaX = (currentDragX - lastDragX) * ROTATION_SPEED;
+    model.rotation.y -= deltaX;
+    lastDragX = currentDragX;
+  }
+  
+  // Rotación suave en el visor 2D (antes de entrar en RA)
+  if (model && !renderer.xr.isPresenting) {
+     model.rotation.y += 0.005;
   }
 
-  // --- LÓGICA DE HIT-TEST (AHORA SE EJECUTA SIEMPRE) ---
-  // Quitamos la condición "&& model.visible === false"
-  if (frame) { 
-    
+  // Lógica de Hit-Test (solo si estamos en RA en Android)
+  if (frame && !isIOS()) {
     const referenceSpace = renderer.xr.getReferenceSpace();
     const session = renderer.xr.getSession();
 
-    // 1. Pedir la fuente del Hit Test (solo una vez)
     if (hitTestSourceRequested === false) {
       session.requestReferenceSpace('viewer').then((viewerSpace) => {
         session.requestHitTestSource({ space: viewerSpace }).then((source) => {
@@ -159,16 +215,11 @@ function animate(timestamp, frame) {
       hitTestSourceRequested = true;
     }
 
-    // 2. Obtener los resultados del Hit Test (en cada frame)
     if (hitTestSource) {
       const hitTestResults = frame.getHitTestResults(hitTestSource);
-
-      // 3. Comprobar si "chocamos" con algo
       if (hitTestResults.length > 0) {
         const hit = hitTestResults[0]; 
         const hitPose = hit.getPose(referenceSpace);
-
-        // 4. Mover la retícula a esa posición
         reticle.visible = true;
         reticle.matrix.fromArray(hitPose.transform.matrix);
       } else {
@@ -176,9 +227,6 @@ function animate(timestamp, frame) {
       }
     }
   }
-  // --- FIN DE LÓGICA DE HIT-TEST ---
 
-  // Dibujar la escena
   renderer.render(scene, camera);
 }
-// --- FIN DE MODIFICACIÓN ---

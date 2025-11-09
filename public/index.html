@@ -2,11 +2,29 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>V7</title>
+  <title>V30</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { margin: 0; }
     canvas { display: block; }
+
+    /* --- NUEVO CSS PARA EL BOTÓN DE IOS --- */
+    #ar-button-ios {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: #007aff; /* Color azul de Apple */
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 14px 24px;
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      display: none; /* Oculto por defecto */
+      z-index: 10;
+    }
   </style>
 
   <script type="importmap">
@@ -21,6 +39,10 @@
 </head>
 <body>
   
+  <a id="ar-link-ios" rel="ar" style="display: none;">
+    <button id="ar-button-ios">Activar AR (iOS)</button>
+  </a>
+
   <script type="module" src="./app.js"></script>
 </body>
 </html>
